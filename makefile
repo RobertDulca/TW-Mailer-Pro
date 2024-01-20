@@ -1,6 +1,7 @@
 # Define compilers and flags
 CXX=g++
 CXXFLAGS=-Wall -Wextra -g
+LIBS=-lldap -llber
 
 # Default target
 all: twmailer-client twmailer-server
@@ -11,7 +12,7 @@ twmailer-client: twmailer-client.cpp
 
 # Compile server
 twmailer-server: twmailer-server.cpp
-	$(CXX) $(CXXFLAGS) twmailer-server.cpp -o twmailer-server
+	$(CXX) $(CXXFLAGS) twmailer-server.cpp -o twmailer-server ${LIBS}
 
 # Clean objects and executables
 clean:

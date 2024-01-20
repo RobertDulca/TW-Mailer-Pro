@@ -10,6 +10,7 @@
 #include <filesystem>
 #include <thread>
 #include <mutex>
+#include <ldap.h>
 
 std::mutex mutex;
 
@@ -187,6 +188,82 @@ void handleDelCommand(int client_socket, const std::string& mailSpoolDirectory) 
     }
 }
 
+std::string trimPW(std::string input){
+    if (!input.empty()) {
+        while (input.back() == '\n')
+            input.pop_back();
+    }
+    return input;
+}
+
+void handleLoginUser(int client_socket) {
+    std::string usernameInput = readLine(client_socket);
+    std::string passwdInput = readLine(client_socket);
+
+    // LDAP config
+    // anonymous bind with user and pw empty
+    const char *ldapUri = "ldap://ldap.technikum-wien.at:389";
+    const int ldapVersion = LDAP_VERSION3;
+    int rc = 0; // return code
+    std::string password = trimPW(passwdInput);
+    std::string username =
+            "uid=" + usernameInput + ",ou=people,dc=technikum-wien,dc=at";
+
+    std::cout<<username;
+    // setup LDAP connection
+    LDAP *ldapHandle;
+    rc = ldap_initialize(&ldapHandle, ldapUri);
+
+    if (rc != LDAP_SUCCESS) {
+        fprintf(stderr, "ldap_init failed\n");
+        std::string response = "ERR\n";
+        send(client_socket, response.c_str(), response.length(), 0);
+        return;
+    }
+
+    // set version options
+    rc = ldap_set_option(ldapHandle,
+                         LDAP_OPT_PROTOCOL_VERSION, // OPTION
+                         &ldapVersion);             // IN-Value
+    if (rc != LDAP_OPT_SUCCESS) {
+        fprintf(stderr, "ldap_set_option(PROTOCOL_VERSION): %s\n",
+                ldap_err2string(rc));
+        ldap_unbind_ext_s(ldapHandle, NULL, NULL);
+        std::string response = "ERR\n";
+        send(client_socket, response.c_str(), response.length(), 0);
+        return;
+    }
+
+    // initialize TLS
+    rc = ldap_start_tls_s(ldapHandle, NULL, NULL);
+    if (rc != LDAP_SUCCESS) {
+        fprintf(stderr, "ldap_start_tls_s(): %s\n", ldap_err2string(rc));
+        ldap_unbind_ext_s(ldapHandle, NULL, NULL);
+        std::string response = "ERR\n";
+        send(client_socket, response.c_str(), response.length(), 0);
+        return;
+    }
+
+    // bind credentials
+    BerValue bindCredentials;
+    bindCredentials.bv_val = (char *)password.c_str();
+    bindCredentials.bv_len = strlen(password.c_str());
+    BerValue *servercredp; // server's credentials
+    rc = ldap_sasl_bind_s(ldapHandle, username.c_str(), LDAP_SASL_SIMPLE,
+                          &bindCredentials, NULL, NULL, &servercredp);
+    if (rc != LDAP_SUCCESS) {
+        fprintf(stderr, "LDAP bind error: %s\n", ldap_err2string(rc));
+        ldap_unbind_ext_s(ldapHandle, NULL, NULL);
+        std::string response = "ERR\n";
+        send(client_socket, response.c_str(), response.length(), 0);
+        return;
+    }
+    ldap_unbind_ext_s(ldapHandle, NULL, NULL);
+
+    std::string response = "OK\n";
+    send(client_socket, response.c_str(), response.length(), 0);
+}
+
 void handleClient(int client_socket, const std::string& mailSpoolDirectory) {
     while (true) {
         char buffer[1024] = {0};
@@ -201,6 +278,8 @@ void handleClient(int client_socket, const std::string& mailSpoolDirectory) {
 
         if (command.substr(0, 4).compare("SEND") == 0) {
             handleSendCommand(client_socket, mailSpoolDirectory);
+        } else if (command.substr(0, 5).compare("LOGIN") == 0) {
+            handleLoginUser(client_socket);
         } else if (command.substr(0, 4).compare("LIST") == 0) {
             handleListCommand(client_socket, mailSpoolDirectory);
         } else if (command.substr(0, 4).compare("READ") == 0) {
@@ -212,6 +291,8 @@ void handleClient(int client_socket, const std::string& mailSpoolDirectory) {
             break; // Exit the loop if QUIT command is received
         } else {
             std::cout << "Unknown command received" << std::endl;
+            std::string response = "ERR\n";
+            send(client_socket, response.c_str(), response.length(), 0);
         }
     }
 

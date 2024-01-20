@@ -41,104 +41,124 @@ int main(int argc, char *argv[]) {
 
     std::cout << "Connected to the server.\n";
 
+    bool isLoggedIn = false;
     std::string input;
     while (true) {
         std::cout << "\nEnter command (SEND/LIST/READ/DELETE/QUIT): ";
         std::getline(std::cin, input);
 
         if (input == "QUIT") {
-            break;
-        } else if (input == "SEND") {
-            send(sock, "SEND\n", 5, 0);
-
-            std::cout << "Enter sender: ";
-            std::getline(std::cin, input);
-            send(sock, (input + "\n").c_str(), input.length() + 1, 0);
-
-            std::cout << "Enter receiver: ";
-            std::getline(std::cin, input);
-            send(sock, (input + "\n").c_str(), input.length() + 1, 0);
-
-            std::cout << "Enter subject: ";
-            std::getline(std::cin, input);
-            send(sock, (input + "\n").c_str(), input.length() + 1, 0);
-
-            std::cout << "Enter message (end with a single '.'): ";
-            do {
-                std::getline(std::cin, input);
-                send(sock, (input + "\n").c_str(), input.length() + 1, 0);
-            } while (input != ".");
-
-            // Read server response
-            char buffer[1024] = {0};
-            read(sock, buffer, 1024);
-            std::cout << "Server response: " << buffer << std::endl;
-        }else if (input == "LIST") {
-            send(sock, "LIST\n", strlen("LIST\n"), 0);
-            std::cout << "Enter username: ";
-            std::getline(std::cin, input);
-            input += "\n";
-            send(sock, input.c_str(), input.length(), 0);
-
-            // Read and display the number of messages
-            char buffer[1024] = {0};
-            ssize_t bytes_read = recv(sock, buffer, sizeof(buffer) - 1, 0);
-            if (bytes_read <= 0) {
-                std::cerr << "Error reading from server or connection closed.\n";
-                continue;
-            }
-            buffer[bytes_read] = '\0'; // Null-terminate the buffer
-            std::istringstream iss(buffer);
-            int messageCount;
-            iss >> messageCount; // Extract the message count
-            std::cout << "Number of messages: " << messageCount << "\n";
-
-            // Read and display each subject line
-            for (int i = 0; i < messageCount; ++i) {
-                std::string subject;
-                std::getline(iss, subject);
-                if (subject.empty()) {
-                    std::getline(iss, subject);
-                }
-                std::cout << "Subject " << (i + 1) << ": " << subject << "\n";
-            }
-        }
-        else if (input == "READ") {
-            send(sock, "READ\n", 5, 0);
-
-            std::cout << "Enter username: ";
-            std::getline(std::cin, input);
-            send(sock, (input + "\n").c_str(), input.length() + 1, 0);
-
-            std::cout << "Enter message number: ";
-            std::getline(std::cin, input);
-            send(sock, (input + "\n").c_str(), input.length() + 1, 0);
-
-            char buffer[1024] = {0};
-            read(sock, buffer, 1024);
-            std::cout << "Server response:\n" << buffer << std::endl;
-        }
-        else if (input == "DELETE") {
-            send(sock, "DELETE\n", 7, 0);
-
-            std::cout << "Enter username: ";
-            std::getline(std::cin, input);
-            send(sock, (input + "\n").c_str(), input.length() + 1, 0);
-
-            std::cout << "Enter message number: ";
-            std::getline(std::cin, input);
-            send(sock, (input + "\n").c_str(), input.length() + 1, 0);
-
-            char buffer[1024] = {0};
-            read(sock, buffer, 1024);
-            std::cout << "Server response: " << buffer << std::endl;
-        }
-        else if (input == "QUIT") {
             send(sock, "QUIT\n", 5, 0);
             break;
         }
-        else { std::cout << "Invalid command.\n"; }
 
+        if (!isLoggedIn && input == "LOGIN") {
+            send(sock, "LOGIN\n", 5, 0);
+
+            std::cout << "Enter username: ";
+            std::getline(std::cin, input);
+            send(sock, (input + "\n").c_str(), input.length() + 1, 0);
+
+            std::cout << "Enter password: ";
+            std::getline(std::cin, input);
+            send(sock, (input + "\n").c_str(), input.length() + 1, 0);
+
+            char buffer[1024] = {0};
+            read(sock, buffer, 1024);
+
+            if (strncmp(buffer, "OK\n", 3) == 0) {
+                isLoggedIn = true;
+                std::cout << "Server response: " << buffer << std::endl;
+            } else if (strncmp(buffer, "ERR\n", 4) == 0) {
+                std::cout << "Server response: " << buffer << std::endl;
+            }
+        }
+
+        if (isLoggedIn) {
+            if (input == "SEND") {
+                send(sock, "SEND\n", 5, 0);
+
+                std::cout << "Enter sender: ";
+                std::getline(std::cin, input);
+                send(sock, (input + "\n").c_str(), input.length() + 1, 0);
+
+                std::cout << "Enter receiver: ";
+                std::getline(std::cin, input);
+                send(sock, (input + "\n").c_str(), input.length() + 1, 0);
+
+                std::cout << "Enter subject: ";
+                std::getline(std::cin, input);
+                send(sock, (input + "\n").c_str(), input.length() + 1, 0);
+
+                std::cout << "Enter message (end with a single '.'): ";
+                do {
+                    std::getline(std::cin, input);
+                    send(sock, (input + "\n").c_str(), input.length() + 1, 0);
+                } while (input != ".");
+
+                // Read server response
+                char buffer[1024] = {0};
+                read(sock, buffer, 1024);
+                std::cout << "Server response: " << buffer << std::endl;
+            } else if (input == "LIST") {
+                send(sock, "LIST\n", strlen("LIST\n"), 0);
+                std::cout << "Enter username: ";
+                std::getline(std::cin, input);
+                input += "\n";
+                send(sock, input.c_str(), input.length(), 0);
+
+                // Read and display the number of messages
+                char buffer[1024] = {0};
+                ssize_t bytes_read = recv(sock, buffer, sizeof(buffer) - 1, 0);
+                if (bytes_read <= 0) {
+                    std::cerr << "Error reading from server or connection closed.\n";
+                    continue;
+                }
+                buffer[bytes_read] = '\0'; // Null-terminate the buffer
+                std::istringstream iss(buffer);
+                int messageCount;
+                iss >> messageCount; // Extract the message count
+                std::cout << "Number of messages: " << messageCount << "\n";
+
+                // Read and display each subject line
+                for (int i = 0; i < messageCount; ++i) {
+                    std::string subject;
+                    std::getline(iss, subject);
+                    if (subject.empty()) {
+                        std::getline(iss, subject);
+                    }
+                    std::cout << "Subject " << (i + 1) << ": " << subject << "\n";
+                }
+            } else if (input == "READ") {
+                send(sock, "READ\n", 5, 0);
+
+                std::cout << "Enter username: ";
+                std::getline(std::cin, input);
+                send(sock, (input + "\n").c_str(), input.length() + 1, 0);
+
+                std::cout << "Enter message number: ";
+                std::getline(std::cin, input);
+                send(sock, (input + "\n").c_str(), input.length() + 1, 0);
+
+                char buffer[1024] = {0};
+                read(sock, buffer, 1024);
+                std::cout << "Server response:\n" << buffer << std::endl;
+            } else if (input == "DELETE") {
+                send(sock, "DELETE\n", 7, 0);
+
+                std::cout << "Enter username: ";
+                std::getline(std::cin, input);
+                send(sock, (input + "\n").c_str(), input.length() + 1, 0);
+
+                std::cout << "Enter message number: ";
+                std::getline(std::cin, input);
+                send(sock, (input + "\n").c_str(), input.length() + 1, 0);
+
+                char buffer[1024] = {0};
+                read(sock, buffer, 1024);
+                std::cout << "Server response: " << buffer << std::endl;
+            } else { std::cout << "Invalid command.\n"; }
+        }
     }
 
     close(sock);
