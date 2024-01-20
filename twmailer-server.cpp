@@ -51,7 +51,7 @@ void handleSendCommand(int client_socket, const std::string& mailSpoolDirectory)
         send(client_socket, response.c_str(), response.length(), 0);
         return;
     }
-
+    //construct the format of the files
     emailFile << "From: " << sender << "\n";
     emailFile << "To: " << receiver << "\n";
     emailFile << "Subject: " << subject << "\n";
@@ -67,7 +67,7 @@ void handleSendCommand(int client_socket, const std::string& mailSpoolDirectory)
     std::string response = "OK\n";
     send(client_socket, response.c_str(), response.length(), 0);
 }
-
+//iterates over files of a specific user
 std::vector<std::string> getEmailSubjects(const std::string& receiverDirectory) {
     std::vector<std::string> subjects;
     DIR* dir = opendir(receiverDirectory.c_str());
@@ -85,40 +85,12 @@ std::vector<std::string> getEmailSubjects(const std::string& receiverDirectory) 
     return subjects;
 }
 
-// Modify handleListCommand and other relevant functions to use receiverDirectory
+// handles the list request
 void handleListCommand(int client_socket, const std::string& mailSpoolDirectory) {
-    std::string username = sessionInfo[client_socket]; // Use username from session info
+    std::string username = sessionInfo[client_socket];
     std::string receiverDirectory = mailSpoolDirectory + "/" + username;
 
     std::vector<std::string> subjects = getEmailSubjects(receiverDirectory);
-    DIR* dir = opendir(mailSpoolDirectory.c_str());
-
-    if (dir != nullptr) {
-        struct dirent* entry;
-        while ((entry = readdir(dir)) != nullptr) {
-            if (entry->d_type == DT_REG) {
-                std::string filename = entry->d_name;
-                if (filename.find(username) != std::string::npos) {
-                    std::string filePath = mailSpoolDirectory + "/" + filename;
-                    std::ifstream emailFile(filePath);
-                    if (emailFile.is_open()) {
-                        std::string line;
-                        while (std::getline(emailFile, line)) {
-                            if (line.rfind("Subject: ", 0) == 0) {
-                                subjects.push_back(line.substr(9)); // Get the subject without the "Subject: " part
-                                break;
-                            }
-                        }
-                        emailFile.close();
-                    }
-                }
-            }
-        }
-        closedir(dir);
-    } else {
-        perror("Unable to open mail spool directory");
-        return; // Exit if we cannot open the directory
-    }
 
     // Send the count of messages to the client
     std::string countStr = std::to_string(subjects.size()) + "\n";
@@ -130,7 +102,7 @@ void handleListCommand(int client_socket, const std::string& mailSpoolDirectory)
         send(client_socket, subjectWithNewLine.c_str(), subjectWithNewLine.size(), 0);
     }
 }
-
+// reads through the files of a specific user
 void handleReadCommand(int client_socket, const std::string& mailSpoolDirectory) {
     std::string username = sessionInfo[client_socket]; // Use username from session info
     std::string messageNumberStr = readLine(client_socket);
@@ -261,7 +233,7 @@ void handleLoginUser(int client_socket) {
         return;
     }
     ldap_unbind_ext_s(ldapHandle, NULL, NULL);
-
+    //savin user in session map
     sessionInfo[client_socket] = usernameInput;
     std::string response = "OK\n";
     send(client_socket, response.c_str(), response.length(), 0);

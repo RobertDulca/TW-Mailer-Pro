@@ -72,6 +72,7 @@ int main(int argc, char *argv[]) {
             } else if (strncmp(buffer, "ERR\n", 4) == 0) {
                 std::cout << "Server response: " << buffer << std::endl;
             }
+            continue;
         }
 
         if (isLoggedIn) {
@@ -107,19 +108,29 @@ int main(int argc, char *argv[]) {
                     continue;
                 }
                 buffer[bytes_read] = '\0'; // Null-terminate the buffer
+
                 std::istringstream iss(buffer);
-                int messageCount;
-                iss >> messageCount; // Extract the message count
+                std::string line;
+                std::getline(iss, line); // First line should be the count
+                int messageCount = std::stoi(line);
+
                 std::cout << "Number of messages: " << messageCount << "\n";
 
                 // Read and display each subject line
                 for (int i = 0; i < messageCount; ++i) {
-                    std::string subject;
-                    std::getline(iss, subject);
-                    if (subject.empty()) {
-                        std::getline(iss, subject);
+                    if (!std::getline(iss, line) || line.empty()) {
+                        // Attempt to read more from the socket if the stream is exhausted
+                        bytes_read = recv(sock, buffer, sizeof(buffer) - 1, 0);
+                        if (bytes_read <= 0) {
+                            std::cerr << "Error reading from server or connection closed.\n";
+                            break;
+                        }
+                        buffer[bytes_read] = '\0';
+                        iss.clear();
+                        iss.str(buffer);
+                        std::getline(iss, line); // Read the subject line
                     }
-                    std::cout << "Subject " << (i + 1) << ": " << subject << "\n";
+                    std::cout << "Subject " << (i + 1) << ": " << line << "\n";
                 }
             } else if (input == "READ") {
                 send(sock, "READ\n", 5, 0);
@@ -141,7 +152,9 @@ int main(int argc, char *argv[]) {
                 char buffer[1024] = {0};
                 read(sock, buffer, 1024);
                 std::cout << "Server response: " << buffer << std::endl;
-            } else { std::cout << "Invalid command.\n"; }
+            } else {
+                std::cout << "Invalid command.\n";
+            }
         }
     }
 
