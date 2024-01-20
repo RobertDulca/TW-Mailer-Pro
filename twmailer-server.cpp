@@ -11,8 +11,10 @@
 #include <thread>
 #include <mutex>
 #include <ldap.h>
+#include <map>
 
 std::mutex mutex;
+std::map<int, std::string> sessionInfo;
 
 std::string readLine(int socket) {
     std::string line;
@@ -24,7 +26,7 @@ std::string readLine(int socket) {
 }
 
 void handleSendCommand(int client_socket, const std::string& mailSpoolDirectory) {
-    std::string sender = readLine(client_socket);
+    std::string sender = sessionInfo[client_socket];
     std::string receiver = readLine(client_socket);
     std::string subject = readLine(client_socket);
 
@@ -85,7 +87,7 @@ std::vector<std::string> getEmailSubjects(const std::string& receiverDirectory) 
 
 // Modify handleListCommand and other relevant functions to use receiverDirectory
 void handleListCommand(int client_socket, const std::string& mailSpoolDirectory) {
-    std::string username = readLine(client_socket);
+    std::string username = sessionInfo[client_socket]; // Use username from session info
     std::string receiverDirectory = mailSpoolDirectory + "/" + username;
 
     std::vector<std::string> subjects = getEmailSubjects(receiverDirectory);
@@ -130,7 +132,7 @@ void handleListCommand(int client_socket, const std::string& mailSpoolDirectory)
 }
 
 void handleReadCommand(int client_socket, const std::string& mailSpoolDirectory) {
-    std::string username = readLine(client_socket);
+    std::string username = sessionInfo[client_socket]; // Use username from session info
     std::string messageNumberStr = readLine(client_socket);
     int messageNumber = std::stoi(messageNumberStr);
 
@@ -165,7 +167,7 @@ void handleReadCommand(int client_socket, const std::string& mailSpoolDirectory)
 }
 
 void handleDelCommand(int client_socket, const std::string& mailSpoolDirectory) {
-    std::string username = readLine(client_socket);
+    std::string username = sessionInfo[client_socket]; // Use username from session info
     std::string messageNumberStr = readLine(client_socket);
     int messageNumber = std::stoi(messageNumberStr);
 
@@ -260,6 +262,7 @@ void handleLoginUser(int client_socket) {
     }
     ldap_unbind_ext_s(ldapHandle, NULL, NULL);
 
+    sessionInfo[client_socket] = usernameInput;
     std::string response = "OK\n";
     send(client_socket, response.c_str(), response.length(), 0);
 }

@@ -44,7 +44,7 @@ int main(int argc, char *argv[]) {
     bool isLoggedIn = false;
     std::string input;
     while (true) {
-        std::cout << "\nEnter command (SEND/LIST/READ/DELETE/QUIT): ";
+        std::cout << "\nEnter command (LOGIN/SEND/LIST/READ/DELETE/QUIT): ";
         std::getline(std::cin, input);
 
         if (input == "QUIT") {
@@ -78,10 +78,6 @@ int main(int argc, char *argv[]) {
             if (input == "SEND") {
                 send(sock, "SEND\n", 5, 0);
 
-                std::cout << "Enter sender: ";
-                std::getline(std::cin, input);
-                send(sock, (input + "\n").c_str(), input.length() + 1, 0);
-
                 std::cout << "Enter receiver: ";
                 std::getline(std::cin, input);
                 send(sock, (input + "\n").c_str(), input.length() + 1, 0);
@@ -102,10 +98,6 @@ int main(int argc, char *argv[]) {
                 std::cout << "Server response: " << buffer << std::endl;
             } else if (input == "LIST") {
                 send(sock, "LIST\n", strlen("LIST\n"), 0);
-                std::cout << "Enter username: ";
-                std::getline(std::cin, input);
-                input += "\n";
-                send(sock, input.c_str(), input.length(), 0);
 
                 // Read and display the number of messages
                 char buffer[1024] = {0};
@@ -132,10 +124,6 @@ int main(int argc, char *argv[]) {
             } else if (input == "READ") {
                 send(sock, "READ\n", 5, 0);
 
-                std::cout << "Enter username: ";
-                std::getline(std::cin, input);
-                send(sock, (input + "\n").c_str(), input.length() + 1, 0);
-
                 std::cout << "Enter message number: ";
                 std::getline(std::cin, input);
                 send(sock, (input + "\n").c_str(), input.length() + 1, 0);
@@ -145,10 +133,6 @@ int main(int argc, char *argv[]) {
                 std::cout << "Server response:\n" << buffer << std::endl;
             } else if (input == "DELETE") {
                 send(sock, "DELETE\n", 7, 0);
-
-                std::cout << "Enter username: ";
-                std::getline(std::cin, input);
-                send(sock, (input + "\n").c_str(), input.length() + 1, 0);
 
                 std::cout << "Enter message number: ";
                 std::getline(std::cin, input);
