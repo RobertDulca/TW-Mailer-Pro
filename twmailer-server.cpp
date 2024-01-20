@@ -8,6 +8,10 @@
 #include <fstream>
 #include <ctime>
 #include <filesystem>
+#include <thread>
+#include <mutex>
+
+std::mutex mutex;
 
 std::string readLine(int socket) {
     std::string line;
@@ -124,8 +128,6 @@ void handleListCommand(int client_socket, const std::string& mailSpoolDirectory)
     }
 }
 
-
-
 void handleReadCommand(int client_socket, const std::string& mailSpoolDirectory) {
     std::string username = readLine(client_socket);
     std::string messageNumberStr = readLine(client_socket);
@@ -185,6 +187,38 @@ void handleDelCommand(int client_socket, const std::string& mailSpoolDirectory) 
     }
 }
 
+void handleClient(int client_socket, const std::string& mailSpoolDirectory) {
+    while (true) {
+        char buffer[1024] = {0};
+        ssize_t bytes_read = read(client_socket, buffer, 1024);
+        if (bytes_read <= 0) {
+            break; // Break the loop if read fails or client disconnects
+        }
+
+        std::string command(buffer);
+
+        std::lock_guard<std::mutex> lock(mutex); // Lock the critical section
+
+        if (command.substr(0, 4).compare("SEND") == 0) {
+            handleSendCommand(client_socket, mailSpoolDirectory);
+        } else if (command.substr(0, 4).compare("LIST") == 0) {
+            handleListCommand(client_socket, mailSpoolDirectory);
+        } else if (command.substr(0, 4).compare("READ") == 0) {
+            handleReadCommand(client_socket, mailSpoolDirectory);
+        } else if (command.substr(0, 6) == "DELETE") {
+            handleDelCommand(client_socket, mailSpoolDirectory);
+        } else if (command.substr(0, 4) == "QUIT") {
+            std::cout << "Closing connection with client" << std::endl;
+            break; // Exit the loop if QUIT command is received
+        } else {
+            std::cout << "Unknown command received" << std::endl;
+        }
+    }
+
+    close(client_socket);
+    std::cout << "Connection closed" << std::endl;
+}
+
 int main(int argc, char *argv[]) {
     if (argc != 3) {
         std::cerr << "Usage: ./twmailer-server <port> <mail-spool-directoryname>\n";
@@ -233,6 +267,7 @@ int main(int argc, char *argv[]) {
 
     std::cout << "Server started and listening on port " << port << std::endl;
 
+
     while (true) {
         if ((client_socket = accept(server_fd, (struct sockaddr *)&address, (socklen_t*)&addrlen)) < 0) {
             perror("accept");
@@ -241,34 +276,8 @@ int main(int argc, char *argv[]) {
 
         std::cout << "Connection accepted" << std::endl;
 
-        bool keepConnectionAlive = true;
-        while (keepConnectionAlive) {
-            char buffer[1024] = {0};
-            ssize_t bytes_read = read(client_socket, buffer, 1024);
-            if (bytes_read <= 0) {
-                break; // Break the loop if read fails or client disconnects
-            }
-
-            std::string command(buffer);
-
-            if (command.substr(0, 4).compare("SEND") == 0) {
-                handleSendCommand(client_socket, mailSpoolDirectory);
-            } else if (command.substr(0, 4).compare("LIST") == 0) {
-                handleListCommand(client_socket, mailSpoolDirectory);
-            } else if (command.substr(0, 4).compare("READ") == 0) {
-                handleReadCommand(client_socket, mailSpoolDirectory);
-            } else if (command.substr(0, 6) == "DELETE") {
-                handleDelCommand(client_socket, mailSpoolDirectory);
-            } else if (command.substr(0, 4) == "QUIT") {
-                keepConnectionAlive = false; // Set flag to close connection
-                std::cout << "Closing connection with client" << std::endl;
-            } else {
-                std::cout << "Unknown command received" << std::endl;
-            }
-        }
-
-        close(client_socket);
-        std::cout << "Connection closed" << std::endl;
+        std::thread clientThread(handleClient, client_socket, mailSpoolDirectory);
+        clientThread.detach(); // Detach the thread to allow it to run independently
     }
 
 
